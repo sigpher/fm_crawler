@@ -1,6 +1,8 @@
 use regex::Regex;
+use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
 use std::time::Duration;
 
+const DATABASE: &'static str = "data.db";
 
 // async fn get_html(url: &str) -> String {
 pub async fn get_html(url: &str) -> Option<String> {
@@ -30,7 +32,7 @@ pub fn get_links(html: &str) -> Vec<String> {
 pub fn get_standard_info(html: &str) -> Standard {
     let title_re = Regex::new(r#"(?s)title2.*?<span>(?<title>.*?)<font"#).unwrap();
     // let state_re = Regex::new(r#"(?s)<td bgcolor.*?<img src="(?<state_image>.*?)""#).unwrap();
-    let state_re = Regex::new(r#"(?s)标准状态.*?<img src="(?<state_image>.*?)""#).unwrap();
+    let status_re = Regex::new(r#"(?s)标准状态.*?<img src="(?<status_image>.*?)""#).unwrap();
     let published_at_re =
         Regex::new(r#"(?s)发布日期.*?(?<published_at>\d{4}-\d{2}-\d{2})"#).unwrap();
     let effective_at_re =
@@ -47,10 +49,10 @@ pub fn get_standard_info(html: &str) -> Standard {
         .as_str()
         .to_string();
 
-    let state = state_re
+    let status = status_re
         .captures(html)
         .unwrap()
-        .name("state_image")
+        .name("status_image")
         .unwrap()
         .as_str()
         .to_string();
@@ -89,7 +91,7 @@ pub fn get_standard_info(html: &str) -> Standard {
 
     Standard {
         title,
-        state,
+        status,
         published_at,
         effective_at,
         issued_by,
@@ -100,9 +102,29 @@ pub fn get_standard_info(html: &str) -> Standard {
 #[derive(Debug)]
 pub struct Standard {
     pub title: String,
-    pub state: String,
+    pub status: String,
     pub published_at: String,
     pub effective_at: String,
     pub issued_by: String,
     pub link: String,
+}
+
+pub async fn get_pool() -> sqlx::SqlitePool {
+    SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(DATABASE)
+        .await
+        .unwrap()
+}
+
+pub async fn insert_data(pool: &SqlitePool, standard: Standard) {
+    query("INSERT INTO foodmate (title, status, published_at, effective_at,issued_by, link) VALUES(?,?,?,?,?,?)")
+    .bind(standard.title)
+    .bind(standard.status)
+    .bind(standard.published_at)
+    .bind(standard.effective_at)
+    .bind(standard.issued_by)
+    .bind(standard.link)
+    .execute(pool)
+    .await.unwrap();
 }

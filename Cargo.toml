@@ -12,3 +12,4 @@ anyhow = {version = "*"}
 serde = {version =  "*", features = ["derive"]}
 serde_json = {version = "*"}
 regex = {version = "*"}
+sqlx = {version = "*",features = ["runtime-tokio","sqlite"]}
