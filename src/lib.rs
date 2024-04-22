@@ -1,8 +1,10 @@
+use log::info;
+use redis::{aio::MultiplexedConnection, AsyncCommands, RedisResult};
 use regex::Regex;
-use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
-use std::time::Duration;
+// use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
+use std::{path::Path, time::Duration};
 
-const DATABASE: &'static str = "data.db";
+// const DATABASE: &'static str = "data.db";
 
 // async fn get_html(url: &str) -> String {
 pub async fn get_html(url: &str) -> Option<String> {
@@ -30,6 +32,7 @@ pub fn get_links(html: &str) -> Vec<String> {
 }
 
 pub fn get_standard_info(html: &str) -> Standard {
+    let item_id_re = Regex::new(r"<script.*?item_id=(?<item_id>\d{4,}),").unwrap();
     let title_re = Regex::new(r#"(?s)title2.*?<span>(?<title>.*?)<font"#).unwrap();
     // let state_re = Regex::new(r#"(?s)<td bgcolor.*?<img src="(?<state_image>.*?)""#).unwrap();
     let status_re = Regex::new(r#"(?s)标准状态.*?<img src="(?<status_image>.*?)""#).unwrap();
@@ -39,7 +42,17 @@ pub fn get_standard_info(html: &str) -> Standard {
         Regex::new(r#"(?s)实施日期.*?(?<effective_at>\d{4}-\d{2}-\d{2})"#).unwrap();
     let issued_by_re =
         Regex::new(r##"(?s)颁发部门.*?<td bgcolor="#FFFFFF">(?<issued_by>.*?)</td>"##).unwrap();
-    let link_re = Regex::new(r#"(?s)class="downk.*?href="(?<link>.*?)""#).unwrap();
+    // let link_re = Regex::new(r#"(?s)class="downk.*?href="(?<link>.*?)""#).unwrap();
+
+    let item_id = item_id_re
+        .captures(html)
+        .unwrap()
+        .name("item_id")
+        .unwrap()
+        .as_str()
+        .trim()
+        .parse::<u32>()
+        .unwrap();
 
     let title = title_re
         .captures(html)
@@ -54,8 +67,18 @@ pub fn get_standard_info(html: &str) -> Standard {
         .unwrap()
         .name("status_image")
         .unwrap()
-        .as_str()
-        .to_string();
+        .as_str();
+
+    let filename = Path::new(status).file_stem().unwrap().to_str().unwrap();
+
+    let status = match filename {
+        "bfyx" => "部分有效".to_string(),
+        "jjfz" => "即将废止".to_string(),
+        "jjss" => "即将生效".to_string(),
+        "xxyx" => "现行有效".to_string(),
+        "yjfz" => "已经废止".to_string(),
+        _ => "".to_string(),
+    };
 
     let published_at = published_at_re
         .captures(html)
@@ -81,50 +104,126 @@ pub fn get_standard_info(html: &str) -> Standard {
         .as_str()
         .to_string();
 
-    let link = link_re
-        .captures(html)
-        .unwrap()
-        .name("link")
-        .unwrap()
-        .as_str()
-        .to_string();
+    // let link = link_re
+    //     .captures(html)
+    //     .unwrap()
+    //     .name("link")
+    //     .unwrap()
+    //     .as_str()
+    //     .to_string();
 
     Standard {
+        item_id,
         title,
         status,
         published_at,
         effective_at,
         issued_by,
-        link,
+        // link,
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Standard {
+    pub item_id: u32,
     pub title: String,
     pub status: String,
     pub published_at: String,
     pub effective_at: String,
     pub issued_by: String,
-    pub link: String,
+    // pub link: String,
 }
 
-pub async fn get_pool() -> sqlx::SqlitePool {
-    SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(DATABASE)
+// pub async fn get_pool() -> sqlx::SqlitePool {
+//     SqlitePoolOptions::new()
+//         .max_connections(100)
+//         .connect(DATABASE)
+//         .await
+//         .unwrap()
+// }
+
+// pub async fn insert_data(pool: SqlitePool, standard: Standard) {
+//     query("INSERT INTO foodmate (title, status, published_at, effective_at,issued_by, link) VALUES($1,$2,$3,$4,$5,$6)")
+//     .bind(standard.title)
+//     .bind(standard.status)
+//     .bind(standard.published_at)
+//     .bind(standard.effective_at)
+//     .bind(standard.issued_by)
+//     .bind(standard.link)
+//     .execute(&pool)
+//     .await.unwrap();
+// }
+
+// pub async fn get_conn() -> RedisResult<MultiplexedConnection> {
+//     let client = redis::Client::open("redis://:131233@13672808880.imwork.net:53323")?;
+//     let conn = client.get_multiplexed_tokio_connection().await;
+//     conn
+// }
+
+// pub async fn set_data(standard: Standard) -> RedisResult<()> {
+//     let mut conn = get_conn().await?;
+//     conn.hset_multiple(
+//         format!("foodmate:{}", standard.item_id),
+//         &[
+//             ("title", standard.title),
+//             ("status", standard.status),
+//             ("published_at", standard.published_at),
+//             ("effective_at", standard.effective_at),
+//             ("issued_by", standard.issued_by),
+//         ],
+//     )
+//     .await?;
+//     info!("Get connected");
+//     Ok(())
+// }
+
+pub async fn get_conn() -> MultiplexedConnection {
+    let client = redis::Client::open("redis://:131233@13672808880.imwork.net:53323").unwrap();
+    // let conn = client.get_multiplexed_tokio_connection().await;
+    let conn = client
+        .get_multiplexed_async_connection_with_timeouts(
+            Duration::from_secs(5),
+            Duration::from_secs(1),
+        )
         .await
-        .unwrap()
+        .unwrap();
+    conn
 }
 
-pub async fn insert_data(pool: &SqlitePool, standard: Standard) {
-    query("INSERT INTO foodmate (title, status, published_at, effective_at,issued_by, link) VALUES(?,?,?,?,?,?)")
-    .bind(standard.title)
-    .bind(standard.status)
-    .bind(standard.published_at)
-    .bind(standard.effective_at)
-    .bind(standard.issued_by)
-    .bind(standard.link)
-    .execute(pool)
-    .await.unwrap();
+pub async fn set_data(standard: Standard) -> RedisResult<()> {
+    let mut conn = get_conn().await;
+    // conn.hset_multiple(
+    conn.hset_multiple(
+        format!("foodmate:{}", standard.item_id),
+        &[
+            ("title", standard.title),
+            ("status", standard.status),
+            ("published_at", standard.published_at),
+            ("effective_at", standard.effective_at),
+            ("issued_by", standard.issued_by),
+        ],
+    )
+    .await?;
+    info!("Get connected");
+    Ok(())
+}
+
+pub async fn get_all_keys() -> RedisResult<Vec<String>> {
+    let mut conn = get_conn().await;
+    let keys: Vec<_> = conn.keys("foodmate:*").await?;
+
+    Ok(keys)
+}
+
+pub fn count(keys: Vec<String>) -> u32 {
+    let mut count = 0;
+    for _ in keys {
+        count += 1;
+    }
+    count
+}
+
+pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
+    let ret: Vec<String> = conn.hget(key,"title").await.unwrap();
+    println!("{:?}", ret);
 }

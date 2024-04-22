@@ -13,3 +13,6 @@ serde = {version =  "*", features = ["derive"]}
 serde_json = {version = "*"}
 regex = {version = "*"}
 sqlx = {version = "*",features = ["runtime-tokio","sqlite"]}
+log = { version = "*" }
+env_logger = { version = "*" }
+redis = { version = "*", features = ["tokio-native-tls-comp"] }
