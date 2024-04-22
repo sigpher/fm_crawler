@@ -50,9 +50,7 @@ pub fn get_standard_info(html: &str) -> Standard {
         .name("item_id")
         .unwrap()
         .as_str()
-        .trim()
-        .parse::<u32>()
-        .unwrap();
+        .to_string();
 
     let title = title_re
         .captures(html)
@@ -125,7 +123,7 @@ pub fn get_standard_info(html: &str) -> Standard {
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Standard {
-    pub item_id: u32,
+    pub item_id: String,
     pub title: String,
     pub status: String,
     pub published_at: String,
@@ -178,7 +176,8 @@ pub struct Standard {
 // }
 
 pub async fn get_conn() -> MultiplexedConnection {
-    let client = redis::Client::open("redis://:131233@13672808880.imwork.net:53323").unwrap();
+    // let client = redis::Client::open("redis://:131233@13672808880.imwork.net:53323").unwrap();
+    let client = redis::Client::open("redis://:131233@127.0.0.1").unwrap();
     // let conn = client.get_multiplexed_tokio_connection().await;
     let conn = client
         .get_multiplexed_async_connection_with_timeouts(
@@ -224,6 +223,60 @@ pub fn count(keys: Vec<String>) -> u32 {
 }
 
 pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
-    let ret: Vec<String> = conn.hget(key,"title").await.unwrap();
-    println!("{:?}", ret);
+    let ( title, status, published_at, effective_at,issued_by): (
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = redis::pipe()
+        .atomic()
+        // .hget(key, "item_id")
+        .hget(key, "title")
+        .hget(key, "status")
+        .hget(key, "published_at")
+        .hget(key, "effective_at")
+        .hget(key, "issued_by")
+        .query_async(conn)
+        .await
+        .unwrap();
+    println!("{title}");
+    println!("{status}");
+    println!("{published_at}");
+    println!("{effective_at}");
+    println!("{issued_by}");
 }
+
+// pub async fn insert_data(standard: Standard) {
+//     let mut conn = get_conn().await;
+//     let _ret:() = redis::pipe()
+//         .atomic()
+//         // .hget(key, "item_id")
+//         .hset(format!("foodmate:{}",standard.item_id), "title",standard.title).ignore()
+//         .hset(format!("foodmate:{}",standard.item_id), "status",standard.status).ignore()
+//         .hset(format!("foodmate:{}",standard.item_id), "published_at",standard.published_at).ignore()
+//         .hset(format!("foodmate:{}",standard.item_id), "effective_at",standard.effective_at).ignore()
+//         .hset(format!("foodmate:{}",standard.item_id), "issued_by",standard.issued_by).ignore()
+//         .query_async(&mut conn)
+//         .await
+//         .unwrap();
+// }
+
+
+// pub async fn set_data(standard: Standard) -> RedisResult<()> {
+//     let mut conn = get_conn().await;
+//     // conn.hset_multiple(
+//     conn.hset_multiple(
+//         format!("foodmate:{}", standard.item_id),
+//         &[
+//             ("title", standard.title),
+//             ("status", standard.status),
+//             ("published_at", standard.published_at),
+//             ("effective_at", standard.effective_at),
+//             ("issued_by", standard.issued_by),
+//         ],
+//     )
+//     .await?;
+//     info!("Get connected");
+//     Ok(())
+// }
