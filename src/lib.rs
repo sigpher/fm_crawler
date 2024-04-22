@@ -32,7 +32,7 @@ pub fn get_links(html: &str) -> Vec<String> {
 }
 
 pub fn get_standard_info(html: &str) -> Standard {
-    let item_id_re = Regex::new(r"<script.*?item_id=(?<item_id>\d{4,}),").unwrap();
+    let item_id_re = Regex::new(r"<script.*?item_id=(?<item_id>\d{3,}),").unwrap();
     let title_re = Regex::new(r#"(?s)title2.*?<span>(?<title>.*?)<font"#).unwrap();
     // let state_re = Regex::new(r#"(?s)<td bgcolor.*?<img src="(?<state_image>.*?)""#).unwrap();
     let status_re = Regex::new(r#"(?s)标准状态.*?<img src="(?<status_image>.*?)""#).unwrap();
@@ -240,11 +240,7 @@ pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
         .query_async(conn)
         .await
         .unwrap();
-    println!("{title}");
-    println!("{status}");
-    println!("{published_at}");
-    println!("{effective_at}");
-    println!("{issued_by}");
+    println!("{title} {status} {published_at} {effective_at} {issued_by}");
 }
 
 // pub async fn insert_data(standard: Standard) {

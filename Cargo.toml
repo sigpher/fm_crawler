@@ -12,7 +12,8 @@ anyhow = {version = "*"}
 serde = {version =  "*", features = ["derive"]}
 serde_json = {version = "*"}
 regex = {version = "*"}
-sqlx = {version = "*",features = ["runtime-tokio","sqlite"]}
+# sqlx = {version = "*",features = ["runtime-tokio","sqlite"]}
+sqlx = {version = "*",features = ["runtime-tokio","postgres","tls-rustls"]}
 log = { version = "*" }
 env_logger = { version = "*" }
 redis = { version = "*", features = ["tokio-native-tls-comp"] }
