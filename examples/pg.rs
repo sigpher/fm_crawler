@@ -1,4 +1,3 @@
-use fm_crawler::Standard;
 use log::info;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
@@ -25,10 +24,21 @@ async fn get_pool() -> Result<PgPool, sqlx::Error> {
 async fn show_data_by_pg() {
     let pool = get_pool().await.unwrap();
     println!("get pool");
-    let info:Vec<_> = sqlx::query("SELECT * from foodmate")
+    let data = sqlx::query_as::<_,Data>("Select title,status,published_at,effective_at,issued_by from foodmate")
         .fetch_all(&pool)
         .await
         .unwrap();
-    info!("finished");
+
+    for d in data{
+        println!("{:?}",d);
+    }
 }
 
+#[derive(Debug,sqlx::FromRow)]
+pub struct Data{
+    pub title:String,
+    pub status:String,
+    pub published_at:String,
+    pub effective_at:String,
+    pub issued_by :String,
+}

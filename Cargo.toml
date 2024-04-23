@@ -17,3 +17,4 @@ sqlx = {version = "*",features = ["runtime-tokio","postgres","tls-rustls"]}
 log = { version = "*" }
 env_logger = { version = "*" }
 redis = { version = "*", features = ["tokio-native-tls-comp"] }
+futures = {version = "*"}

@@ -1,6 +1,7 @@
 use log::info;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisResult};
 use regex::Regex;
+use sqlx::{postgres::PgPoolOptions, PgPool};
 // use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
 use std::{path::Path, time::Duration};
 
@@ -50,7 +51,8 @@ pub fn get_standard_info(html: &str) -> Standard {
         .name("item_id")
         .unwrap()
         .as_str()
-        .to_string();
+        .parse::<i64>()
+        .unwrap();
 
     let title = title_re
         .captures(html)
@@ -121,9 +123,9 @@ pub fn get_standard_info(html: &str) -> Standard {
     }
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize,sqlx::FromRow)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, sqlx::FromRow)]
 pub struct Standard {
-    pub item_id: String,
+    pub item_id: i64,
     pub title: String,
     pub status: String,
     pub published_at: String,
@@ -140,17 +142,26 @@ pub struct Standard {
 //         .unwrap()
 // }
 
-// pub async fn insert_data(pool: SqlitePool, standard: Standard) {
-//     query("INSERT INTO foodmate (title, status, published_at, effective_at,issued_by, link) VALUES($1,$2,$3,$4,$5,$6)")
-//     .bind(standard.title)
-//     .bind(standard.status)
-//     .bind(standard.published_at)
-//     .bind(standard.effective_at)
-//     .bind(standard.issued_by)
-//     .bind(standard.link)
-//     .execute(&pool)
-//     .await.unwrap();
-// }
+pub async fn get_pool() -> Result<PgPool, sqlx::Error> {
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect("postgres://postgres:131233@localhost:5432/postgres")
+        .await?;
+    info!("connect database success");
+    Ok(pool)
+}
+
+pub async fn insert_data(pool: &PgPool, standard: Standard) {
+    sqlx::query(r"INSERT INTO foodmate (item_id, title, status, published_at, effective_at,issued_by) VALUES($1,$2,$3,$4,$5,$6)")
+    .bind(standard.item_id)
+    .bind(standard.title)
+    .bind(standard.status)
+    .bind(standard.published_at)
+    .bind(standard.effective_at)
+    .bind(standard.issued_by)
+    .execute(pool)
+    .await.unwrap();
+}
 
 // pub async fn get_conn() -> RedisResult<MultiplexedConnection> {
 //     let client = redis::Client::open("redis://:131233@13672808880.imwork.net:53323")?;
@@ -223,7 +234,7 @@ pub fn count(keys: Vec<String>) -> u32 {
 }
 
 pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
-    let ( title, status, published_at, effective_at,issued_by): (
+    let (title, status, published_at, effective_at, issued_by): (
         String,
         String,
         String,
@@ -257,7 +268,6 @@ pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
 //         .await
 //         .unwrap();
 // }
-
 
 // pub async fn set_data(standard: Standard) -> RedisResult<()> {
 //     let mut conn = get_conn().await;
