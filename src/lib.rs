@@ -1,23 +1,24 @@
+use futures::future::ok;
 use log::info;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisResult};
 use regex::Regex;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
 // use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
 use std::{path::Path, time::Duration};
 
-// const DATABASE: &'static str = "data.db";
+const DATABASE: &'static str = "data.db";
 
 // async fn get_html(url: &str) -> String {
 pub async fn get_html(url: &str) -> Option<String> {
     let user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0";
     let client = reqwest::Client::builder()
         .user_agent(user_agent)
-        .connect_timeout(Duration::from_secs(6))
+        // .connect_timeout(Duration::from_secs(6))
         .referer(true)
         .build()
         .unwrap();
 
-    let resp = client.get(url).send().await.unwrap();
+    let resp = client.get(url).send().await.expect("Get No Response");
     if resp.status().is_success() {
         let text = resp.text_with_charset("gb2312").await.unwrap();
         return Some(text);
@@ -104,14 +105,6 @@ pub fn get_standard_info(html: &str) -> Standard {
         .as_str()
         .to_string();
 
-    // let link = link_re
-    //     .captures(html)
-    //     .unwrap()
-    //     .name("link")
-    //     .unwrap()
-    //     .as_str()
-    //     .to_string();
-
     Standard {
         item_id,
         title,
@@ -131,20 +124,28 @@ pub struct Standard {
     pub published_at: String,
     pub effective_at: String,
     pub issued_by: String,
-    // pub link: String,
 }
 
-// pub async fn get_pool() -> sqlx::SqlitePool {
-//     SqlitePoolOptions::new()
-//         .max_connections(100)
-//         .connect(DATABASE)
-//         .await
-//         .unwrap()
-// }
+pub async fn get_sqlite_pool() -> Result<SqlitePool, sqlx::Error> {
+    let pool = SqlitePoolOptions::new().connect(DATABASE).await.unwrap();
+    Ok(pool)
+}
+
+pub async fn insert_data_by_sqlite(pool: &SqlitePool, standard: Standard) {
+    sqlx::query(r"INSERT INTO foodmate (item_id, title, status, published_at, effective_at,issued_by) VALUES($1,$2,$3,$4,$5,$6)")
+    .bind(standard.item_id)
+    .bind(standard.title)
+    .bind(standard.status)
+    .bind(standard.published_at)
+    .bind(standard.effective_at)
+    .bind(standard.issued_by)
+    .execute(pool)
+    .await.unwrap();
+}
 
 pub async fn get_pool() -> Result<PgPool, sqlx::Error> {
     let pool = PgPoolOptions::new()
-        .max_connections(5)
+        .max_connections(10)
         .connect("postgres://postgres:131233@localhost:5432/postgres")
         .await?;
     info!("connect database success");
@@ -286,3 +287,46 @@ pub async fn show_data(conn: &mut MultiplexedConnection, key: &str) {
 //     info!("Get connected");
 //     Ok(())
 // }
+
+pub async fn show_data_by_pg() {
+    let pool = get_pool().await.unwrap();
+    println!("get pool");
+    let data = sqlx::query_as::<_,Data>("Select item_id,title,status,published_at,effective_at,issued_by from foodmate order by item_id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+    for d in data {
+        println!(
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            d.item_id, d.title, d.status, d.published_at, d.effective_at, d.issued_by
+        );
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct Data {
+    pub item_id: i32,
+    pub title: String,
+    pub status: String,
+    pub published_at: String,
+    pub effective_at: String,
+    pub issued_by: String,
+}
+
+
+pub async fn show_data_by_sqlite() {
+    let pool = get_sqlite_pool().await.unwrap();
+    println!("get pool");
+    let data = sqlx::query_as::<_,Data>("Select item_id,title,status,published_at,effective_at,issued_by from foodmate order by item_id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+    for d in data {
+        println!(
+            "{}\t{}\t{}\t{}\t{}\t{}",
+            d.item_id, d.title, d.status, d.published_at, d.effective_at, d.issued_by
+        );
+    }
+}
