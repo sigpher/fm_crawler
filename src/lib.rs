@@ -121,7 +121,7 @@ pub fn get_standard_info(html: &str) -> Standard {
     }
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize,sqlx::FromRow)]
 pub struct Standard {
     pub item_id: String,
     pub title: String,

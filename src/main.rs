@@ -3,7 +3,7 @@
 
 use anyhow::{Ok, Result};
 use fm_crawler::{
-     get_all_keys, get_conn, get_html, get_links, get_standard_info, set_data, show_data
+    get_all_keys, get_conn, get_html, get_links, get_standard_info, set_data, show_data,
 };
 // use log::info;
 
@@ -32,9 +32,9 @@ async fn main() -> Result<()> {
     // }
 
     let mut conn = get_conn().await;
-    
+
     let keys = get_all_keys().await?;
-    
+
     for key in keys {
         show_data(&mut conn, &key).await;
     }
