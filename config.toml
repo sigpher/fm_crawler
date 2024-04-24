@@ -1,0 +1,28 @@
+# database configuration
+[redis]
+host = "127.0.0.1"
+remote_host = "13672808880.imwork.net"
+port = "53323"
+
+[sqlite]
+db = "data.db"
+
+[pg]
+host = "127.0.0.1"
+port = "5432"
+
+# regex configuration
+[regex]
+item_id_re = '<script.*?item_id=(?<item_id>\d{3,}),'
+title_re = '(?s)title2.*?<span>(?<title>.*?)<font'
+state_re = '(?s)<td bgcolor.*?<img src="(?<state_image>.*?)"'
+status_re = '(?s)标准状态.*?<img src="(?<status_image>.*?)'
+published_at_re = '(?s)发布日期.*?(?<published_at>\d{4}-\d{2}-\d{2})'
+effective_at_re = '(?s)实施日期.*?(?<effective_at>\d{4}-\d{2}-\d{2})'
+issued_by_re = '(?s)颁发部门.*?<td bgcolor="#FFFFFF">(?<issued_by>.*?)</td>'
+
+
+# page configuration
+[page]
+base_url = 'http://down.foodmate.net/special/standard/42.html'
+total = 10

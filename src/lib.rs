@@ -1,10 +1,11 @@
-use futures::future::ok;
+use config::{Config, File};
+// use futures::future::ok;
 use log::info;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisResult};
 use regex::Regex;
 use sqlx::{postgres::PgPoolOptions, sqlite::SqlitePoolOptions, PgPool, SqlitePool};
 // use sqlx::{query, sqlite::SqlitePoolOptions, SqlitePool};
-use std::{path::Path, time::Duration};
+use std::{ path::Path, time::Duration};
 
 const DATABASE: &'static str = "data.db";
 
@@ -34,6 +35,7 @@ pub fn get_links(html: &str) -> Vec<String> {
 }
 
 pub fn get_standard_info(html: &str) -> Standard {
+    let config = get_config();
     let item_id_re = Regex::new(r"<script.*?item_id=(?<item_id>\d{3,}),").unwrap();
     let title_re = Regex::new(r#"(?s)title2.*?<span>(?<title>.*?)<font"#).unwrap();
     // let state_re = Regex::new(r#"(?s)<td bgcolor.*?<img src="(?<state_image>.*?)""#).unwrap();
@@ -44,7 +46,6 @@ pub fn get_standard_info(html: &str) -> Standard {
         Regex::new(r#"(?s)实施日期.*?(?<effective_at>\d{4}-\d{2}-\d{2})"#).unwrap();
     let issued_by_re =
         Regex::new(r##"(?s)颁发部门.*?<td bgcolor="#FFFFFF">(?<issued_by>.*?)</td>"##).unwrap();
-    // let link_re = Regex::new(r#"(?s)class="downk.*?href="(?<link>.*?)""#).unwrap();
 
     let item_id = item_id_re
         .captures(html)
@@ -78,6 +79,7 @@ pub fn get_standard_info(html: &str) -> Standard {
         "jjss" => "即将生效".to_string(),
         "xxyx" => "现行有效".to_string(),
         "yjfz" => "已经废止".to_string(),
+        "wz" => "未知".to_string(),
         _ => "".to_string(),
     };
 
@@ -112,7 +114,6 @@ pub fn get_standard_info(html: &str) -> Standard {
         published_at,
         effective_at,
         issued_by,
-        // link,
     }
 }
 
@@ -314,7 +315,6 @@ pub struct Data {
     pub issued_by: String,
 }
 
-
 pub async fn show_data_by_sqlite() {
     let pool = get_sqlite_pool().await.unwrap();
     println!("get pool");
@@ -330,3 +330,11 @@ pub async fn show_data_by_sqlite() {
         );
     }
 }
+
+pub fn get_config() -> Config {
+    Config::builder()
+        .add_source(File::with_name("config.toml"))
+        .build()
+        .expect("构建配置错误")
+}
+
